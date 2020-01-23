@@ -131,9 +131,6 @@ function onClearPlatform() {
 }
 
 function onSaveGcode() {
-	if(noNinja())
-		return;
-	
 	var gcode = new GcodeWriter();	
 	var programName     = $('#programSelect').val();
 	download(programName + ".gcode", gcode.getGcode());
