@@ -1,0 +1,297 @@
+<!--
+WebSlicer
+Copyright (C) 2016 Marcio Teixeira
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+-->
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			html, body {
+				position:  relative;
+				width:     100%;
+				height:    100%;
+				margin:    0;
+				padding:   0;
+			}
+			
+			#myCanvas {
+				display:    block;
+				background: black;
+			}
+			
+			#statusBox {
+				display:       none;
+				position:      absolute;
+				color:         white;
+				width:         300px;
+				height:        150px;
+				z-index:       15;
+				top:           50%;
+				left:          50%;
+				margin:        -75px 0 0 -150px;
+				background:    black;
+				border:        3px solid white;
+				border-radius: 15px;
+				padding:       10px;
+				text-align:    center;
+			}
+			
+			#dropBox {
+				position:      absolute;
+				color:         white;
+				z-index:       15;
+				width:         60px;
+				bottom:        15px;
+				right:         15px;
+				background:    black;
+				border:        2px dashed white;
+				padding:       10px;
+				text-align:    center;
+			}
+		</style>
+	</head>
+	
+	<body>
+		
+		<canvas id="myCanvas">
+			Your browser does not support the HTML5 canvas tag.
+		</canvas>
+		
+		<div id="statusBox"><h1 id="statusText"></h1></div>
+		
+		<div id="dropBox">
+			Drag STL file here.
+		</div>
+
+		<script src="../js/mesh_slicer.js"></script>
+		<script src="../js/stl_reader.js"></script>
+		<script src="../lib/three/three.min.js"></script>
+		<script src="../lib/clipper/clipper.js"></script>
+		
+		<script>
+			var canvas   = document.getElementById('myCanvas');
+			var origin_x = 300;
+			var origin_y = 300;
+			var scale    = 15.0;
+			var layer    = 0;
+			
+			var geometry;
+			var slices;
+			
+			function setUpDragAndDrop(func) {
+				function readFile(evt) {
+					evt.stopPropagation();
+					evt.preventDefault();
+					var f = ('dataTransfer' in evt) ?
+						(evt.dataTransfer.files[0]) :
+						(evt.target.files[0]);
+					if (f) {
+						queueOperation("Loading file", function() {
+							var r = new FileReader();
+							r.onload = function(e) {
+								func(e.target.result);
+							}
+							r.readAsArrayBuffer(f);
+						});
+					}
+				}
+				function handleDragOver(evt) {
+					evt.stopPropagation();
+					evt.preventDefault();
+					evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+				}
+				var da = document.getElementById('dropBox');
+				da.addEventListener('dragover', handleDragOver, false);
+				da.addEventListener('drop',     readFile,       false);
+			}
+			
+			function resizeCanvas() {
+				canvas.width  = window.innerWidth;
+				canvas.height = window.innerHeight;
+				origin_x      = canvas.width/2;
+				origin_y      = canvas.height/2;
+				
+				if(geometry) {
+					var model_width     = geometry.boundingBox.max.x - geometry.boundingBox.min.x;
+					var model_height    = geometry.boundingBox.max.y - geometry.boundingBox.min.y;
+					
+					scale = Math.min(
+						canvas.width  / model_width,
+						canvas.height / model_height
+					) * 0.9;
+					
+					var model_cx = (geometry.boundingBox.max.x + geometry.boundingBox.min.x)/2;
+					var model_cy = (geometry.boundingBox.max.y + geometry.boundingBox.min.y)/2;
+					
+					origin_x -= model_cx * scale;
+					origin_y -= model_cy * scale;
+				}
+				
+				paintCanvas(); 
+			}
+				
+			function setupResizeHandler() {
+				window.addEventListener('resize', resizeCanvas, false);
+				resizeCanvas();
+			}
+			
+			var ops = [];
+			
+			function queueOperation(str, func) {
+				function doOperation() {
+					if(ops.length) {
+						var str = ops[0];
+						
+						var da = document.getElementById('statusBox');
+						da.style.display = 'inline';
+						
+						var el = document.getElementById('statusText');
+						el.innerHTML = str;
+				
+						var func = ops[1];
+						setTimeout(function() {ops.shift(); ops.shift(); func(); doOperation();},10);
+					}
+				}
+				
+				ops.push(str);
+				ops.push(func);
+				if(ops.length == 2) {
+					doOperation();
+				}
+			}
+			
+			function hideStatus() {
+				var da = document.getElementById('statusBox');
+				da.style.display = 'none';
+			}
+			
+			function loadSTLFile(stlData) {
+				function readGeometry() {
+					geometry = GEOMETRY_READERS.readStl(
+						stlData,
+						GEOMETRY_READERS.THREEGeometryCreator
+					);
+				}
+				
+				function sliceGeometry() {
+					var ms = new MeshSlicer();
+					ms.setGeometry(geometry);
+					slices = ms.getSlices();				
+				}
+				
+				function finish() {
+					hideStatus();
+					resizeCanvas();
+					startAnimation();					
+				}
+				
+				queueOperation("Reading geometry",   readGeometry);
+				queueOperation("Slicing model",      sliceGeometry);
+				queueOperation("Starting animation", finish);
+			}
+			
+			function paintLayer(layer) {
+			
+				if(!slices) {
+					return;
+				}
+				
+				var c = document.getElementById("myCanvas");
+				var ctx = c.getContext("2d");
+				
+				var slice = slices[layer];
+				
+				//console.log(slice.z);
+				
+				ctx.clearRect(0,0,c.width,c.height);
+
+				ctx.strokeStyle = "white";
+				SlicerOps.strokePath(ctx, slice.outer_shell, origin_x, origin_y, scale);
+				
+				ctx.strokeStyle = "red";
+				for( var j = 0; j < slice.inner_shell.length; j++ ) {
+					SlicerOps.strokePath(ctx, slice.inner_shell[j], origin_x, origin_y, scale);
+				}
+				
+				ctx.strokeStyle = "yellow";
+				SlicerOps.strokePath(ctx, slice.infill, origin_x, origin_y, scale);
+			}
+        
+			function paintCanvas() {
+				paintLayer(layer);
+			}
+			
+			function startAnimation() {
+				var last = new Date().getTime();
+				
+				function animate() {
+					paintCanvas();
+					
+					layer++;
+					if(layer == slices.length)
+						layer=0;
+					
+					setTimeout( function() {
+						requestAnimationFrame(animate);
+					}, 100);
+				}
+				
+				animate();
+			}
+			
+			/* Fetches a file from an URL, then calls the function callback
+			 * when the file download is complete
+			 */
+			function fetchFile(url, callback, onerror) {
+				var xhr = new XMLHttpRequest();
+				xhr.open("GET", url, true);
+				xhr.responseType = "arraybuffer";
+				xhr.onreadystatechange = function(e) {
+					if (xhr.readyState == 4) {
+						// continue only if HTTP status is "OK"
+						if (xhr.status == 200) {
+							callback(xhr.response);
+						} else {
+							onerror(xhr.status);
+						}
+					}
+				};
+				xhr.send();
+			}
+			
+			function fetchFileFromWebserver(srcUrl) {
+				fetchFile(srcUrl,
+					function(response) {
+						loadSTLFile(response);
+					},
+					function(status) {
+						if(status == 404) {
+							console.log("Downloading " + srcUrl + "... Failed, file not found");
+						} else {
+							console.log("Downloading " + srcUrl + "... Failed, status:" + status);
+						}
+					}
+				);
+			}
+			
+			setUpDragAndDrop(loadSTLFile);
+			setupResizeHandler();
+			
+			fetchFileFromWebserver("test.stl");
+		</script>
+	</body>
+</html>

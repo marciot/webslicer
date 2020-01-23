@@ -1,0 +1,254 @@
+<!--
+WebSlicer
+Copyright (C) 2016 Marcio Teixeira
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+-->
+<script src="unit_test_functions.js"></script>
+<script src="../js/geometry.js"></script>
+<script src="../js/slicer.js"></script>
+
+<script>
+	var model;
+	
+	// Test find vertex
+	
+	var vertices = new VertexCollection();
+	var v1 = vertices.findVertex(0,0,0);
+	var v2 = vertices.findVertex(1,1,1);
+	var v3 = vertices.findVertex(1,1,1);
+	var v4 = vertices.findVertex(0,0,0);
+	var v5 = vertices.findVertex(1,0,0);
+		
+	assertEquals("vertices.count()", "3");
+	assertEquals("v1", "v4");
+	assertNotEquals("v5", "v2");
+	
+	// Test add edge
+	var vertices = new VertexCollection();
+	var edges = new EdgeCollection(vertices);
+	var e1 = edges.addEdge(1,2,0,4,5,0);
+	var e2 = edges.addEdge(7,8,0,1,2,0);
+	
+	assertEquals("e1", "[0,1]");
+	assertEquals("e2", "[2,0]");
+	assertEquals("vertices.count()", "3");
+	assertEquals("edges.count()", "2");
+	
+	// Test getBoundingBox
+	var vertices = new VertexCollection();
+	var edges = new EdgeCollection(vertices);
+	var e1 = edges.addEdge(0, 4,-4,-2,0,-3);
+	var e2 = edges.addEdge(5,-1, 0, 1,2, 1);
+	var bounds = Util.getBoundingBox(edges);
+	assertEquals("bounds.min.x", "-2");
+	assertEquals("bounds.min.y", "-1");
+	assertEquals("bounds.max.x",  "5");
+	assertEquals("bounds.max.y",  "4");
+	assertEquals("bounds.width",  "7");
+	assertEquals("bounds.height",  "5");
+	
+	// Test edge walking 
+	var i = edges.first();
+	assertEquals("i", "0");
+	i = edges.next(i);
+	assertEquals("i", "2");
+	i = edges.next(i);
+	assertEquals("i", "0");
+	
+	i = edges.first(); 
+	i = edges.other(i);
+	assertEquals("i", "1");
+	i = edges.next(i);
+	assertEquals("i", "3");
+	i = edges.next(i);
+	assertEquals("i", "1");
+	
+	// Test append
+	var vertices = new VertexCollection();
+	var edges1 = new EdgeCollection(vertices);
+	var e1 = edges1.addEdge(1,2,3, 4, 5, 6);
+	var e2 = edges1.addEdge(7,8,9,10,11,12);
+	var edges2 = new EdgeCollection(vertices);
+	var e3 = edges2.addEdge(13,14,15, 16, 17, 18);
+	edges1.append(edges2);
+	assertEquals("edges1.array()", "[0,1,2,3,4,5]");
+	
+	// Test add edge
+	var model = new Model();
+	var e1 = model.addEdge(1,2,3,4,5,6);
+	var e2 = model.addEdge(7,8,9,10,11,12);
+	
+	assertEquals("model.numberOfVertices()", "4");
+	assertEquals("model.numberOfEdges()", "2");	
+	
+	// Test edge iterator
+	var iter = model.getEdgeIterator();
+	var v1   = iter.getStartVertex();
+    var v2   = iter.getEndVertex();
+	assertEquals("[v1.x,v1.y,v1.z]", "[1,2,3]");
+	assertEquals("[v2.x,v2.y,v2.z]", "[4,5,6]");
+	var r1 = iter.next();
+	var v1   = iter.getStartVertex();
+    var v2   = iter.getEndVertex();
+	assertEquals("r1", "true");
+	assertEquals("[v1.x,v1.y,v1.z]", "[7,8,9]");
+	assertEquals("[v2.x,v2.y,v2.z]", "[10,11,12]");
+	var r1 = iter.next();
+	assertEquals("r1", "false");
+	
+	// Test unique
+	
+	var uniq = Util.unique([4,3,5,4,6,7,3,4,5,9]);
+	assertEquals("uniq.sort()", "'3,4,5,6,7,9'");
+	
+	// Test getLayers
+	var model = new Model();
+	var e1 = model.addEdge(1,2,3,4,5,6);
+	var e2 = model.addEdge(7,8,9,10,11,12);
+	var layers = Util.numericSort(model.getLayers());
+	assertEquals("layers", "'3,6,9,12'");
+	
+	// Test getEdgesInLayer
+	
+	var model = new Model();
+	assertEquals("model.numberOfVertices()", "0");
+	var v1 = [0,0,0];
+	var v2 = [1,0,0];
+	var v3 = [1,1,0];
+	var v4 = [0,1,0];
+	
+	var v5 = [0,0,1];
+	var v6 = [1,0,1];
+	var v7 = [1,1,1];
+	var v8 = [0,1,1];
+	
+	var e1 = model.addEdge(v1,v2);
+	var e2 = model.addEdge(v2,v3);
+	var e3 = model.addEdge(v3,v4);
+	var e4 = model.addEdge(v4,v1);
+	
+	var e5 = model.addEdge(v5,v6);
+	var e6 = model.addEdge(v6,v7);
+	var e7 = model.addEdge(v7,v8);
+	var e8 = model.addEdge(v8,v5);
+	
+	var e9 = model.addEdge(v1,v5);
+	var e10 = model.addEdge(v2,v6);
+	var e11 = model.addEdge(v3,v7);
+	var e12 = model.addEdge(v4,v8);
+		
+	assertEquals("model.numberOfVertices()", "8");
+	assertEquals("model.numberOfEdges()",    "12");
+	
+	var layers = Util.numericSort(model.getLayers());
+	assertEquals("layers", "'0,1'");
+	
+	var edges = model.getEdgesInLayer(0);
+	assertEquals("edges.length",    "8");
+	assertEquals("edges","'"+e1.concat(e2,e3,e4).join()+"'");
+	
+	var edges = model.getEdgesInLayer(1);
+	assertEquals("edges.length",    "8");
+	assertEquals("edges","'"+[e5,e6,e7,e8].join()+"'");
+	
+	// Test indicesOfLikeValues
+	
+	var indices = Util.indicesOfLikeValues([4,2,4,6,4,2,3,4,1],2);
+	assertEquals("indices.length",     "3");
+	assertEquals("indices", "'0,4,7'");
+	
+	// Test otherEdge
+	
+	var ec = new EdgeCollection();
+	assertEquals("ec.other(0)",     "1");
+	assertEquals("ec.other(1)",     "0");
+	assertEquals("ec.other(2)",     "3");
+	assertEquals("ec.other(3)",     "2");
+	
+	// Test getLoops
+	
+	var vertices = [];
+	var cycle = new EdgeCollection(vertices,[0,1, 1,2, 2,3, 3,0]);
+	var loops = Util.getLoops(cycle);
+	assertEquals("loops", "'"+cycle.toString()+"'");
+	
+	var flipped = new EdgeCollection(vertices,[0,1, 2,1, 2,3, 0,3]);
+	var loops = Util.getLoops(flipped);
+	assertEquals("loops", "'"+cycle.toString()+"'");
+	
+	var scrambled = new EdgeCollection(vertices,[0,1, 3,0, 2,3, 1,2]);
+	var loops = Util.getLoops(scrambled);
+	assertEquals("loops.length",     "1");
+	assertEquals("loops", "'"+cycle.toString()+"'");
+	
+	var twocycles = new EdgeCollection(vertices,[0,1, 1,2, 2,3, 3, 0,4,5, 5,6, 6,4]);
+	var loops = Util.getLoops(twocycles);
+	assertEquals("loops.length",     "2");
+	assertEquals("loops", "'"+twocycles.toString()+"'");
+	
+	var scrambled = new EdgeCollection(vertices,[0,1, 4,5, 6,4, 2,3, 1,2, 3,0, 5,6]);
+	var loops = Util.getLoops(scrambled);
+	assertEquals("loops.length",     "2");
+	assertEquals("loops", "'"+twocycles.toString()+"'");
+	
+	var scrambled = new EdgeCollection(vertices,[0,1, 4,5, 4,6, 3,2, 1,2, 0,3, 5,6]);
+	var loops = Util.getLoops(scrambled);
+	assertEquals("loops.length",     "2");
+	assertEquals("loops", "'"+twocycles.toString()+"'");
+	
+	// Test write model
+	
+	var layered = model.layeredEdges();
+	assertEquals("layered", "'"+e1.concat(e2,e3,e4,e5,e6,e7,e8).join()+"'");
+	
+	// Test line intersection algorithm
+	
+	var i = lineIntersection({x:-1,y:-1},{x:1,y:1},{x:1,y:-1},{x:-1,y:1});
+	assertEquals("i.t", "0.5");
+	assertEquals("i.x", "0");
+	assertEquals("i.y", "0");
+	
+	var i = lineIntersection({x:-1,y:0},{x:1,y:0},{x:1,y:-1},{x:-1,y:1});
+	assertEquals("i.t", "0.5");
+	assertEquals("i.x", "0");
+	assertEquals("i.y", "0");
+	
+	var i = lineIntersection({x:0,y:-1},{x:0,y:1},{x:1,y:-1},{x:-1,y:1});
+	assertEquals("i.t", "0.5");
+	assertEquals("i.x", "0");
+	assertEquals("i.y", "0");
+	
+	// Test whether push of undefined does anything
+	function nothing() {};
+	var array = [];
+	array.push(1);
+	array.push(nothing());
+	assertEquals("array.length", "2");
+	
+	// Test PairwiseLookupTable
+	
+	var table = new Util.PairwiseLookupTable();
+	table.lookup(3,5).value = 10;
+	table.lookup(1,3).value = 20;
+	table.lookup(5,2).value = 30;
+	table.lookup(1,2).value = 40;
+	table.lookup(1,3).value = 50;
+	table.lookup(4,2).value = 60;
+	assertEquals("table.lookup(3,1).value", "50");
+	assertEquals("table.lookup(5,2).value", "30");
+	
+	summarize();
+</script>
