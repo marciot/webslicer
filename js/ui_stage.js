@@ -236,7 +236,7 @@ function Stage() {
 	
 	this.addGeometry = function(geometry) {
 		var obj = new PrintableObject(geometry);
-		obj.sliceObject();
+		//obj.sliceObject();
 		printableObjects.push(obj);
 		arrangeObjectsOnPlatform();
 		constructScene();
